@@ -1,4 +1,5 @@
-import pg from "pg";
+// import pg from "pg";
+import {readFile} from "fs/promises"; // para leer el archivo sql con las tablas
 import { Pool } from "pg";
 import { env } from "./env.js";
 
@@ -14,18 +15,23 @@ export async function createTable() {
     
     // esta queri por ejemplo es lo que podemos tener para ingresar en base de datos
     // desde donde hacemos el client.query que es donde hacemos la query a sql. (generamos scripts sql)
-    const query = `
-        CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            name VARCHAR(100) NOT NULL,
-            email VARCHAR(100) NOT NULL UNIQUE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-    `;
+    
+
+
+    // const query = `
+    //     CREATE TABLE IF NOT EXISTS users (
+    //         id SERIAL PRIMARY KEY,
+    //         name VARCHAR(100) NOT NULL,
+    //         email VARCHAR(100) NOT NULL UNIQUE,
+    //         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    //     );
+    // `;
 
     try {
+        const sqlText = await readFile("./data/tables_saludplus.sql", "utf-8"); // leemos el archivo sql con las tablas
         await client.query("BEGIN"); // iniciamos una transacción
-        await client.query(query);
+        // await client.query(query);
+        await client.query(sqlText); // ejecutamos el contenido del archivo SQL
         await client.query("COMMIT"); // confirmamos la transacción
         console.log("Tabla 'users' creada o ya existe.");
     } catch (error) {
