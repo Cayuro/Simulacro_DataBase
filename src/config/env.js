@@ -24,9 +24,3 @@ export const env = {
     fileDataCsv: process.env.FILE_DATA_CSV ?? "./data/data_simulated.csv" // revisar que si esté bien enviada
 };
 
-
-// import express from "express";
-// import cors from "cors";
-// import { router } from "./routes/index.js";
-// import { error } from "console";
-
