@@ -1,0 +1,42 @@
+> api@1.0.0 dev
+> node server.js
+
+node:internal/modules/esm/resolve:275
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/home/cohorte5/Escritorio/API/config/postgres.js' imported from /home/cohorte5/Escritorio/API/server.js
+    at finalizeResolution (node:internal/modules/esm/resolve:275:11)
+    ...
+
+node:internal/modules/esm/resolve:275
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'express' imported from /home/cohorte5/Escritorio/API/app.js
+    ...
+
+ReferenceError: __dirname is not defined in ES module scope
+    at file:///home/cohorte5/Escritorio/API/src/config/env.js:6:11
+    ...
+
+Error al crear la tabla: Error: The server does not support SSL connections
+    at /home/cohorte5/Escritorio/API/node_modules/pg-pool/index.js:45:11
+    ...
+
+Error al crear la tabla: ReferenceError: app is not defined
+    at file:///home/cohorte5/Escritorio/API/server.js:14:5
+    ...
+
+
+[dotenv@17.3.1] injecting env (4) from .env -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+Creando la conexión con postgres, creandose tablas
+Tabla 'users' creada o ya existe.
+Tabla creada o ya existe.
+Servidor escuchando en el puerto 3000
+
+[1] Cannot find module 'postgres.js'                --> poner bien las rutas
+[2] Cannot find package 'express'                   --> asegurarse de hacer npm install express
+[3] __dirname is not defined in ES module scope     --> cambiar el __dirname como se exporta  
+[4] The server does not support SSL connections     --> quitar ssl conection si está en localhost
+[5] ReferenceError: app is not defined              --> eror por dejar comentado lo de app.js
