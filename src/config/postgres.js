@@ -108,4 +108,11 @@ export async function normalizeData() {
     }
 }
 
-export default {pool, createTable}; // exportamos el pool para utilizarlo en otras partes de la aplicaciones, y con este podemos usarlo hasta para consultas.
+export default {pool, createTable, loadMigrationData, normalizeData}; // exportamos el pool para utilizarlo en otras partes de la aplicaciones, y con este podemos usarlo hasta para consultas.
+
+// const __filename = fileURLToPath(import.meta.url);
+// const __dirname = path.dirname(__filename);
+
+// const sqlPath = path.join(__dirname, "data", "tables_saludplus.sql");
+
+// const sqlText = await readFile(sqlPath, "utf-8");
