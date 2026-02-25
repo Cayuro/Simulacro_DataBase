@@ -1,6 +1,6 @@
 import app from "./app.js"; // aquí se importa el app para conexión a express
-import { createTable } from "./src/config/postgres.js";
-import { env } from "./src/config/env.js";
+import { createTable } from "./config/postgres.js";
+import { env } from "./config/env.js";
 
 // aquí el puerto hasta ahora para escuchar el servidor, desplegarlo en este puerto
 const PORT = env.port || 3000;
@@ -8,7 +8,11 @@ const PORT = env.port || 3000;
 
 try {
     console.log("Creando la conexión con postgres, creandose tablas");
-    await createTable(); // Llamamos a la función para crear la tabla al iniciar la aplicación
+    if (process.env.RUN_MIGRATION === "true") {
+  await createTable();
+  await loadMigrationData();
+  await normalizeData();
+} // Llamamos a la función para crear la tabla al iniciar la aplicación
     console.log("Tabla creada o ya existe."); 
     
     app.listen(PORT, () => {
