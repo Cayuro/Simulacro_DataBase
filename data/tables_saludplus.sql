@@ -83,6 +83,5 @@ ALTER TABLE "patients"
 ADD FOREIGN KEY("insurance_id") REFERENCES "insurances"("id_insurance")
 ON UPDATE CASCADE ON DELETE CASCADE;
 ALTER TABLE "doctors"
-ADD FOREIGN KEY("id_specialty") REFERENCES "specialty"("id_specialty")
-ON UPDATE CASCADE ON DELETE CASCADE; 
-`;
+ADD FOREIGN KEY("id_specialty") REFERENCES "specialties"("id_specialty")
+ON UPDATE CASCADE ON DELETE CASCADE;
