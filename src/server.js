@@ -1,6 +1,6 @@
 import app from "./app.js"; // aquí se importa el app para conexión a express
-import { createTable } from "./src/config/postgres.js";
-import { env } from "./src/config/env.js";
+import { createTable } from "./config/postgres.js";
+import { env } from "./config/env.js";
 
 // aquí el puerto hasta ahora para escuchar el servidor, desplegarlo en este puerto
 const PORT = env.port || 3000;
