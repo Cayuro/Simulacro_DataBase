@@ -29,13 +29,15 @@ export async function createTable() {
 
     try {
         const sqlText = await readFile("./data/tables_saludplus.sql", "utf-8"); // leemos el archivo sql con las tablas
+        const sqlIndex = await readFile("./data/index.sql", "utf-8"); // leemos el archivo sql con los indices
         await client.query("BEGIN"); // iniciamos una transacción
         // await client.query(query);
         await client.query(sqlText); // ejecutamos el contenido del archivo SQL
+        await client.query(sqlIndex); //  con los indices
         await client.query("COMMIT"); // confirmamos la transacción
-        console.log("Tabla 'users' creada o ya existe.");
+        console.log("Tablas creadas o ya existen.");
     } catch (error) {
-        console.error("Error al crear la tabla 'users':", error);
+        console.error("Error al crear las tablas:", error);
         await client.query("ROLLBACK"); // en caso de error, hacemos un rollback para revertir cualquier cambio parcial
     } finally {
         client.release(); // liberamos la conexión al cliente
