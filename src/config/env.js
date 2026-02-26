@@ -16,11 +16,18 @@ for (const key of required) {
     }
 };
 
+const asBoolean = (value, fallback = false) => {
+    if (value === undefined || value === null || value === "") return fallback;
+    return String(value).toLowerCase() === "true";
+};
+
 // aquí se verifica las variables de entorno a las cuales podemos acceder desde cualquier parte de la api
 export const env = {
     port: process.env.PORT || 3000,
     postgresUri: process.env.POSTGRES_URI,
     mongoUri: process.env.MONGO_URI,
-    fileDataCsv: process.env.FILE_DATA_CSV ?? "./data/data_simulated.csv" // revisar que si esté bien enviada
+    fileDataCsv: process.env.FILE_DATA_CSV ?? "./data/data_simulated.csv",
+    runMigrationOnStartup: asBoolean(process.env.RUN_MIGRATION, false),
+    nodeEnv: process.env.NODE_ENV || "development"
 };
 
