@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS "patients" (
 	"email" VARCHAR(50) NOT NULL UNIQUE,
 	"phone" VARCHAR(50) NOT NULL,
 	"address" VARCHAR(50) NOT NULL,
-	"insurance_id" INTEGER,
+	
 	PRIMARY KEY("id_patient")
 );
 
@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS "appointments" (
 	"patient_id" INTEGER NOT NULL,
 	"doctor_id" INTEGER NOT NULL,
 	"treatment_id" INTEGER NOT NULL,
+	"insurance_id" INTEGER,
 	PRIMARY KEY("id_appointment")
 );
 

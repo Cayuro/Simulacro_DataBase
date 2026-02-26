@@ -3,9 +3,6 @@ SELECT DISTINCT
     m.patient_name,
     m.patient_email,
     m.patient_phone,
-    m.patient_address,
-    i.id_insurance
+    m.patient_address
 FROM migration m
-LEFT JOIN insurances i
-ON m.insurance_provider = i.name
 ON CONFLICT (email) DO NOTHING;
