@@ -66,13 +66,38 @@ export async function migrate(clearBefore = false) {
                     [row.doctor_name, row.doctor_email, specialty.id]);
                 doctorEmails.add(row.doctor_email);
             }
+
+            // insert treatments
+            if(!treatmentCodes.has(row.treatment_code)){
+                await pool.query(`INSERT INTO treatments (code, description) 
+                    VALUES ($1, $2)`, 
+                    [row.treatment_code, row.treatment_description]);
+                treatmentCodes.add(row.treatment_code);
+            }
+
+            // insert insurance providers
+            if(!insuranceNames.has(row.insurance_provider)){
+                await pool.query(`INSERT INTO insurances_providers (name) 
+                    VALUES ($1)`, [row.insurance_provider]);
+                insuranceNames.add(row.insurance_provider);
+            }
+
+            // insert appointments
+            const { rows: [patient] } = await pool.query(`SELECT id FROM patients WHERE email = $1`, 
+                [row.patient_email]);
+            const { rows: [doctor] } = await pool.query(`SELECT id FROM doctors WHERE email = $1`, 
+                [row.doctor_email]);
+            const { rows: [treatment] } = await pool.query(`SELECT id FROM treatments WHERE code = $1`, 
+                [row.treatment_code]);
+            const { rows: [insurance] } = await pool.query(`SELECT id FROM insurances_providers WHERE name = $1`, 
+                [row.insurance_provider]);
         }
 
-
-
+            console.log('Data migration completed successfully');
 
     }catch(error){
         console.error("Error migrating data:", error);
         throw error;
     }
 }
+
