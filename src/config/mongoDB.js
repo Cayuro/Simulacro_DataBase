@@ -9,7 +9,7 @@ const appointmentSchema = new mongoose.Schema({
   doctorEmail: {type: String, required: true},
   specialty: {type: String, required: true},
   treatmentCode: {type: String},
-  treatmenDescription: {type: String},
+  treatmentDescription: {type: String},
   treatmentCost: {type: Number, required: true},
   insuranceProvider: {type: String, required: true},
   coveragePercentage: {type: Number, required: true},
