@@ -1,0 +1,20 @@
+¿Dónde crear índices?
+
+Regla profesional:
+
+Indexa:
+
+Campos usados en WHERE
+
+Campos usados en JOIN
+
+Campos usados en ORDER BY
+
+Campos usados frecuentemente en búsqueda
+
+No indexar:
+
+Columnas que cambian constantemente
+
+Columnas con muy baja cardinalidad (ej: boolean)
+

@@ -19,6 +19,8 @@ ON appointments(appointment_date);
 CREATE INDEX IF NOT EXISTS idx_appointments_patient_date
 ON appointments(patient_id, appointment_date DESC);
 
+DROP INDEX IF EXISTS uidx_appointments_code_not_null;
+
 CREATE UNIQUE INDEX IF NOT EXISTS uidx_appointments_code
 ON appointments(appointment_code);
 

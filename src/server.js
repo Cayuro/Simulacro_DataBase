@@ -1,20 +1,34 @@
-import app from "./app.js"; // aquí se importa el app para conexión a express
-import { createTable } from "./config/postgres.js";
+import app from "./app.js";
+import { createTables, pool } from "./config/postgres.js";
 import { env } from "./config/env.js";
+import { migrate } from "./services/migrationService.js";
+import { migrateMongo } from "./services/migrateMongoService.js";
+import { connectMongoDB } from "./config/mongoDB.js";
 
-// aquí el puerto hasta ahora para escuchar el servidor, desplegarlo en este puerto
-const PORT = env.port || 3000;
-// con esto se puede utilizar como una API.
+const PORT = Number(env.port) || 3000;
 
-try {
-    console.log("Creando la conexión con postgres, creandose tablas");
-    await createTable(); // Llamamos a la función para crear la tabla al iniciar la aplicación
-    console.log("Tabla creada o ya existe."); 
-    
+async function bootstrap() {
+    // Create PostgreSQL tables
+    await createTables();
+
+    // Connect to MongoDB
+    await connectMongoDB();
+    console.log("MongoDB connected successfully");
+
+    // Run migrations if enabled
+    if (env.runMigrationOnStartup) {
+        const postgresStats = await migrate(true);
+        const mongoStats = await migrateMongo(true);
+        console.log("Startup migration completed", { postgresStats, mongoStats });
+    }
+
     app.listen(PORT, () => {
-        console.log(`Servidor escuchando en el puerto ${PORT}`);
+        console.log(`Server listening on port ${PORT}`);
     });
-} catch (error) {
-    console.error("Error al crear la tabla:", error);
-    process.exit(1); // Salimos del proceso con un código de error
 }
+
+bootstrap().catch(async (error) => {
+    console.error("Bootstrap error:", error);
+    await pool.end();
+    process.exit(1);
+});
