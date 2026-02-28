@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
+import { errorHandler } from './middleware/errorHandler.js';
 
 // crear la aplicacion express
 const app = express();
@@ -56,12 +57,7 @@ app.use((req, res) => {
   });
 });
 
-// middleware para manejar errores globales
-app.use((err, req, res, next) => {
-  console.error('Error:', err.message);
-  res.status(err.status || 500).json({
-    error: err.message || 'Error interno del servidor'
-  });
-});
+// middleware para manejar errores globales (ya importado desde errorHandler.js)
+app.use(errorHandler);
 
 export default app;
