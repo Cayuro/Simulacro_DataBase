@@ -1,183 +1,137 @@
-import fs from 'fs/promises';
+import { readFile } from 'fs/promises';
+import { resolve } from 'path';
+import { parse } from 'csv-parse/sync';
 import { pool } from '../config/postgres.js';
 import { env } from '../config/env.js';
 
-// funcion auxiliar: parsear una linea del CSV
-function parseCsvLine(line) {
-  return line.split(',').map((value) => value.trim());
-}
-
 // funcion principal: migrar CSV a PostgreSQL
-export async function migrateDataToPostgres() {
-  const client = await pool.connect();
-
+export async function migrateDataToPostgres(clearBefore = false) {
   try {
-    await client.query('BEGIN');  // iniciar transaccion
-
     // leer el archivo CSV
-    const csvPath = env.fileDataCsv;
-    const csvContent = await fs.readFile(csvPath, 'utf-8');
-    const lines = csvContent.split(/\r?\n/).filter(Boolean);
-
-    const headers = parseCsvLine(lines[0]);
-    const dataLines = lines.slice(1);
-
-    // convertir cada linea a objeto
-    const rows = dataLines.map((line) => {
-      const values = parseCsvLine(line);
-      const row = {};
-      headers.forEach((header, index) => {
-        row[header] = values[index];
-      });
-      return row;
+    const csvPath = resolve(env.fileDataCsv);
+    const fileContent = await readFile(csvPath, 'utf-8');
+    
+    // parsear CSV a objetos (automático con csv-parse)
+    const rows = parse(fileContent, {
+      columns: true,           // usa la primera fila como nombres de columnas
+      skip_empty_lines: true,  // ignora líneas vacías
+      trim: true,              // quita espacios en blanco
     });
 
-    // ── Insertar datos unicos (evitar duplicados con ON CONFLICT)
+    console.log(`Leído CSV: ${rows.length} filas`);
 
-    // 1. Insertar pacientes
-    const patientsMap = new Map();
+    // limpiar datos previos si se solicita
+    if (clearBefore) {
+      await pool.query('BEGIN');
+      await pool.query(`TRUNCATE TABLE patients, treatments, 
+        insurances_providers, specialitys, doctors, appointments CASCADE`);
+      await pool.query('COMMIT');
+      console.log('Datos previos eliminados');
+    }
+
+    // sets para evitar duplicados (solo guardamos una vez cada entidad)
+    const patientEmails = new Set();
+    const doctorEmails = new Set();
+    const treatmentCodes = new Set();
+    const insuranceNames = new Set();
+    const specialtyNames = new Set();
+
+    // recorrer cada fila del CSV
     for (const row of rows) {
-      if (!patientsMap.has(row.patient_email)) {
-        patientsMap.set(row.patient_email, {
-          name: row.patient_name,
-          email: row.patient_email,
-          phone: row.patient_phone,
-          address: row.patient_address,
-        });
+      
+      // 1. insertar paciente (si no existe)
+      const patientEmail = row.patient_email.toLowerCase();
+      if (!patientEmails.has(patientEmail)) {
+        await pool.query(
+          `INSERT INTO patients (name, email, phone, address) 
+           VALUES ($1, $2, $3, $4)`,
+          [row.patient_name, row.patient_email, row.patient_phone, row.patient_address]
+        );
+        patientEmails.add(patientEmail);
       }
-    }
 
-    for (const patient of patientsMap.values()) {
-      await client.query(
-        `INSERT INTO patients (name, email, phone, address)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (email) DO NOTHING`,
-        [patient.name, patient.email, patient.phone, patient.address]
-      );
-    }
-
-    // 2. Insertar especialidades
-    const specialtiesSet = new Set(rows.map((r) => r.specialty));
-    for (const specialty of specialtiesSet) {
-      await client.query(
-        `INSERT INTO specialitys (name) VALUES ($1) ON CONFLICT (name) DO NOTHING`,
-        [specialty]
-      );
-    }
-
-    // 3. Insertar doctores
-    const doctorsMap = new Map();
-    for (const row of rows) {
-      if (!doctorsMap.has(row.doctor_email)) {
-        doctorsMap.set(row.doctor_email, {
-          name: row.doctor_name,
-          email: row.doctor_email,
-          specialty: row.specialty,
-        });
+      // 2. insertar especialidad (si no existe)
+      if (!specialtyNames.has(row.specialty)) {
+        await pool.query(
+          `INSERT INTO specialitys (name) VALUES ($1)`,
+          [row.specialty]
+        );
+        specialtyNames.add(row.specialty);
       }
-    }
 
-    for (const doctor of doctorsMap.values()) {
-      const specialtyResult = await client.query(
-        'SELECT id FROM specialitys WHERE name = $1',
-        [doctor.specialty]
-      );
-      const specialtyId = specialtyResult.rows[0].id;
+      // 3. insertar doctor (si no existe)
+      if (!doctorEmails.has(row.doctor_email)) {
+        // buscar el ID de la especialidad
+        const { rows: [specialty] } = await pool.query(
+          `SELECT id FROM specialitys WHERE name = $1`,
+          [row.specialty]
+        );
 
-      await client.query(
-        `INSERT INTO doctors (name, email, speciality_id)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (email) DO NOTHING`,
-        [doctor.name, doctor.email, specialtyId]
-      );
-    }
-
-    // 4. Insertar tratamientos
-    const treatmentsMap = new Map();
-    for (const row of rows) {
-      if (!treatmentsMap.has(row.treatment_code)) {
-        treatmentsMap.set(row.treatment_code, {
-          code: row.treatment_code,
-          description: row.treatment_description,
-          cost: parseInt(row.treatment_cost, 10),
-        });
+        await pool.query(
+          `INSERT INTO doctors (name, email, speciality_id) 
+           VALUES ($1, $2, $3)`,
+          [row.doctor_name, row.doctor_email, specialty.id]
+        );
+        doctorEmails.add(row.doctor_email);
       }
-    }
 
-    for (const treatment of treatmentsMap.values()) {
-      await client.query(
-        `INSERT INTO treatments (code, description, cost)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (code) DO NOTHING`,
-        [treatment.code, treatment.description, treatment.cost]
-      );
-    }
-
-    // 5. Insertar proveedores de seguro
-    const insurancesMap = new Map();
-    for (const row of rows) {
-      if (!insurancesMap.has(row.insurance_provider)) {
-        insurancesMap.set(row.insurance_provider, {
-          name: row.insurance_provider,
-          coverage: parseInt(row.coverage_percentage, 10),
-        });
+      // 4. insertar tratamiento (si no existe)
+      if (!treatmentCodes.has(row.treatment_code)) {
+        await pool.query(
+          `INSERT INTO treatments (code, description, cost) 
+           VALUES ($1, $2, $3)`,
+          [row.treatment_code, row.treatment_description, parseInt(row.treatment_cost)]
+        );
+        treatmentCodes.add(row.treatment_code);
       }
-    }
 
-    for (const insurance of insurancesMap.values()) {
-      await client.query(
-        `INSERT INTO insurances_providers (name, coverage_percentage)
-         VALUES ($1, $2)
-         ON CONFLICT (name) DO NOTHING`,
-        [insurance.name, insurance.coverage]
-      );
-    }
+      // 5. insertar seguro (si no existe)
+      if (!insuranceNames.has(row.insurance_provider)) {
+        await pool.query(
+          `INSERT INTO insurances_providers (name, coverage_percentage) 
+           VALUES ($1, $2)`,
+          [row.insurance_provider, parseInt(row.coverage_percentage)]
+        );
+        insuranceNames.add(row.insurance_provider);
+      }
 
-    // 6. Insertar citas (appointments)
-    for (const row of rows) {
-      const patientResult = await client.query(
-        'SELECT id FROM patients WHERE email = $1',
+      // 6. insertar cita (siempre se inserta porque cada fila es una cita única)
+      const { rows: [patient] } = await pool.query(
+        `SELECT id FROM patients WHERE email = $1`,
         [row.patient_email]
       );
-      const patientId = patientResult.rows[0].id;
 
-      const doctorResult = await client.query(
-        'SELECT id FROM doctors WHERE email = $1',
+      const { rows: [doctor] } = await pool.query(
+        `SELECT id FROM doctors WHERE email = $1`,
         [row.doctor_email]
       );
-      const doctorId = doctorResult.rows[0].id;
 
-      const insuranceResult = await client.query(
-        'SELECT id FROM insurances_providers WHERE name = $1',
+      const { rows: [insurance] } = await pool.query(
+        `SELECT id FROM insurances_providers WHERE name = $1`,
         [row.insurance_provider]
       );
-      const insuranceId = insuranceResult.rows[0].id;
 
-      await client.query(
-        `INSERT INTO appointments (id, date, patient_id, doctor_id, treatment_code, insurance_provider_id, amount_paid)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT (id) DO NOTHING`,
+      await pool.query(
+        `INSERT INTO appointments (id, date, patient_id, doctor_id, 
+         treatment_code, insurance_provider_id, amount_paid) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [
           row.appointment_id,
           row.appointment_date,
-          patientId,
-          doctorId,
+          patient.id,
+          doctor.id,
           row.treatment_code,
-          insuranceId,
+          insurance.id,
           parseFloat(row.amount_paid),
         ]
       );
     }
 
-    await client.query('COMMIT');
-    console.log('✅ Migración a PostgreSQL completada');
-
+    console.log('Migración a PostgreSQL completada');
     return { success: true, rowsProcessed: rows.length };
+
   } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('❌ Error en migración PostgreSQL:', error);
+    console.error('Error en migración PostgreSQL:', error);
     throw error;
-  } finally {
-    client.release();
   }
 }

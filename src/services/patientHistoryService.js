@@ -1,76 +1,70 @@
-import fs from 'fs/promises';
+import { readFile } from 'fs/promises';
+import { resolve } from 'path';
+import { parse } from 'csv-parse/sync';
 import { PatientHistory } from '../models/patientHistoryModel.js';
 import { env } from '../config/env.js';
-
-// funcion auxiliar: parsear una linea del CSV
-function parseCsvLine(line) {
-  return line.split(',').map((value) => value.trim());
-}
 
 // funcion principal: migrar CSV a MongoDB (historial de pacientes)
 export async function migratePatientHistoryToMongo() {
   try {
     // leer el archivo CSV
-    const csvPath = env.fileDataCsv;
-    const csvContent = await fs.readFile(csvPath, 'utf-8');
-    const lines = csvContent.split(/\r?\n/).filter(Boolean);
-
-    const headers = parseCsvLine(lines[0]);
-    const dataLines = lines.slice(1);
-
-    // convertir cada linea a objeto
-    const rows = dataLines.map((line) => {
-      const values = parseCsvLine(line);
-      const row = {};
-      headers.forEach((header, index) => {
-        row[header] = values[index];
-      });
-      return row;
+    const csvPath = resolve(env.fileDataCsv);
+    const fileContent = await readFile(csvPath, 'utf-8');
+    
+    // parsear CSV a objetos
+    const rows = parse(fileContent, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
     });
 
-    // agrupar por paciente (1 documento Mongo por paciente)
-    const groupedByPatient = new Map();
+    console.log(`Leído CSV: ${rows.length} filas`);
 
+    // crear un objeto para agrupar citas por paciente
+    const patientsByEmail = {};
+
+    // recorrer cada fila del CSV
     for (const row of rows) {
-      const patientEmail = row.patient_email;
+      const email = row.patient_email;
 
-      // si el paciente no existe en el mapa, crearlo
-      if (!groupedByPatient.has(patientEmail)) {
-        groupedByPatient.set(patientEmail, {
+      // si el paciente no existe en el objeto, crearlo
+      if (!patientsByEmail[email]) {
+        patientsByEmail[email] = {
           patientEmail: row.patient_email,
           patientName: row.patient_name,
           appointments: [],
-        });
+        };
       }
 
-      // agregar la cita al array de appointments
-      groupedByPatient.get(patientEmail).appointments.push({
+      // agregar la cita al array de appointments del paciente
+      patientsByEmail[email].appointments.push({
         appointmentId: row.appointment_id,
-        date: new Date(row.appointment_date),  // convertir a Date
+        date: new Date(row.appointment_date),
         doctorName: row.doctor_name,
         doctorEmail: row.doctor_email,
         specialty: row.specialty,
         treatmentCode: row.treatment_code,
         treatmentDescription: row.treatment_description,
-        treatmentCost: parseInt(row.treatment_cost, 10),
+        treatmentCost: parseInt(row.treatment_cost),
         insuranceProvider: row.insurance_provider,
-        coveragePercentage: parseInt(row.coverage_percentage, 10),
+        coveragePercentage: parseInt(row.coverage_percentage),
         amountPaid: parseFloat(row.amount_paid),
       });
     }
 
-    // convertir el Map a array de documentos
-    const patientDocuments = Array.from(groupedByPatient.values());
+    // convertir el objeto a array de documentos
+    const patientDocuments = Object.values(patientsByEmail);
 
-    // guardar o actualizar cada documento en MongoDB
+    // guardar cada paciente en MongoDB
     let created = 0;
     let updated = 0;
 
     for (const doc of patientDocuments) {
+      // buscar si el paciente ya existe
       const existing = await PatientHistory.findOne({ patientEmail: doc.patientEmail });
 
       if (existing) {
-        // si ya existe, agregar solo las citas nuevas
+        // si existe, agregar las citas nuevas
         existing.appointments.push(...doc.appointments);
         await existing.save();
         updated++;
@@ -81,11 +75,11 @@ export async function migratePatientHistoryToMongo() {
       }
     }
 
-    console.log(`✅ Migración a MongoDB completada: ${created} creados, ${updated} actualizados`);
-
+    console.log(`Migración a MongoDB: ${created} creados, ${updated} actualizados`);
     return { success: true, created, updated };
+
   } catch (error) {
-    console.error('❌ Error en migración MongoDB:', error);
+    console.error('Error en migración MongoDB:', error);
     throw error;
   }
 }
@@ -93,10 +87,5 @@ export async function migratePatientHistoryToMongo() {
 // funcion para consultar historial de un paciente por email
 export async function getPatientHistoryByEmail(email) {
   const history = await PatientHistory.findOne({ patientEmail: email });
-  
-  if (!history) {
-    return null;
-  }
-
-  return history;
+  return history;  // devuelve null si no existe
 }

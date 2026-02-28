@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import { errorHandler } from './middleware/errorHandler.js';
+import migrationRoutes from './routes/migrationRoutes.js';
 
 // crear la aplicacion express
 const app = express();
@@ -48,7 +49,10 @@ app.get('/usuario/:id', (req, res) => {
     ejemplo: 'Prueba: /usuario/123?id=234&nombre=Juanito'
   });
 });
+rutas de la API (importadas desde archivos separados)
+app.use('/api', migrationRoutes);
 
+// 
 // middleware para rutas que no existen 
 app.use((req, res) => {
   res.status(404).json({ 
