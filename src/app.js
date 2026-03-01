@@ -49,7 +49,7 @@ app.get('/usuario/:id', (req, res) => {
     ejemplo: 'Prueba: /usuario/123?id=234&nombre=Juanito'
   });
 });
-rutas de la API (importadas desde archivos separados)
+// rutas de la API (importadas desde archivos separados)
 app.use('/api', migrationRoutes);
 
 // 
