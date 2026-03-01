@@ -44,7 +44,7 @@ export async function migrate(clearBefore = false) {
         }
 
         for (const row of rows) {
-            await client.query(
+            const resultMigration = await client.query(
                 `INSERT INTO migration (
                     appointment_id,
                     appointment_date,
@@ -79,7 +79,9 @@ export async function migrate(clearBefore = false) {
                     treatment_cost = EXCLUDED.treatment_cost,
                     insurance_provider = EXCLUDED.insurance_provider,
                     coverage_percentage = EXCLUDED.coverage_percentage,
-                    amount_paid = EXCLUDED.amount_paid`,
+                    amount_paid = EXCLUDED.amount_paid
+                returning xmax`
+                ,
                 [
                     row.appointment_id,
                     row.appointment_date,
@@ -98,38 +100,49 @@ export async function migrate(clearBefore = false) {
                     row.amount_paid
                 ]
             );
-            stats.migrationUpserts += 1;
+            if (resultMigration.rows[0].xmax === "0") {
+                stats.migrationUpserts += 1;
+            }
 
-            await client.query(
+            const resultSpecialties = await client.query(
                 `INSERT INTO specialties (description)
                  VALUES ($1)
                  ON CONFLICT (description)
-                 DO UPDATE SET description = EXCLUDED.description`,
+                 DO UPDATE SET description = EXCLUDED.description
+                 returning xmax`,
                 [row.specialty]
             );
-            stats.specialtiesUpserts += 1;
+           if (resultSpecialties.rows[0].xmax === "0") {
+               stats.specialtiesUpserts += 1;
+           }
 
-            await client.query(
+            const resultInsurances = await client.query(
                 `INSERT INTO insurances (name, coverage_percentage)
                  VALUES ($1, $2)
                  ON CONFLICT (name)
-                 DO UPDATE SET coverage_percentage = EXCLUDED.coverage_percentage`,
+                 DO UPDATE SET coverage_percentage = EXCLUDED.coverage_percentage
+                 returning xmax`,
                 [row.insurance_provider, row.coverage_percentage]
             );
-            stats.insurancesUpserts += 1;
+            if (resultInsurances.rows[0].xmax === "0") {
+               stats.insurancesUpserts += 1;
+           }
 
-            await client.query(
+            const resultTreatment = await client.query(
                 `INSERT INTO treatments (treatment_code, description, cost)
                  VALUES ($1, $2, $3)
                  ON CONFLICT (treatment_code)
                  DO UPDATE SET
                     description = EXCLUDED.description,
-                    cost = EXCLUDED.cost`,
+                    cost = EXCLUDED.cost
+                    returning xmax`,
                 [row.treatment_code, row.treatment_description, row.treatment_cost]
             );
-            stats.treatmentsUpserts += 1;
-
-            await client.query(
+             if (resultTreatment.rows[0].xmax === "0") {
+               stats.treatmentsUpserts += 1;
+           }
+            
+            const resultPatients = await client.query(
                 `INSERT INTO patients (name, email, phone, address, insurance_id)
                  VALUES (
                     $1,
@@ -143,7 +156,8 @@ export async function migrate(clearBefore = false) {
                     name = EXCLUDED.name,
                     phone = EXCLUDED.phone,
                     address = EXCLUDED.address,
-                    insurance_id = EXCLUDED.insurance_id`,
+                    insurance_id = EXCLUDED.insurance_id
+                    returning xmax`,
                 [
                     row.patient_name,
                     row.patient_email,
@@ -152,9 +166,12 @@ export async function migrate(clearBefore = false) {
                     row.insurance_provider
                 ]
             );
-            stats.patientsUpserts += 1;
 
-            await client.query(
+            if (resultPatients.rows[0].xmax === "0") {
+                stats.patientsUpserts += 1;
+            }
+
+            const resultDoctors = await client.query(
                 `INSERT INTO doctors (name, email, id_specialty)
                  VALUES (
                     $1,
@@ -164,10 +181,13 @@ export async function migrate(clearBefore = false) {
                  ON CONFLICT (email)
                  DO UPDATE SET
                     name = EXCLUDED.name,
-                    id_specialty = EXCLUDED.id_specialty`,
+                    id_specialty = EXCLUDED.id_specialty
+                    returning xmax`,
                 [row.doctor_name, row.doctor_email, row.specialty]
             );
-            stats.doctorsUpserts += 1;
+            if (resultDoctors.rows[0].xmax === "0") {
+                stats.doctorsUpserts += 1;
+            }
 
             await client.query(
                 `INSERT INTO appointments (
@@ -192,7 +212,8 @@ export async function migrate(clearBefore = false) {
                     patient_id = EXCLUDED.patient_id,
                     doctor_id = EXCLUDED.doctor_id,
                     treatment_id = EXCLUDED.treatment_id,
-                    amount_paid = EXCLUDED.amount_paid`,
+                    amount_paid = EXCLUDED.amount_paid
+                    returning xmax`,
                 [
                     row.appointment_id,
                     row.appointment_date,
@@ -202,7 +223,8 @@ export async function migrate(clearBefore = false) {
                     row.amount_paid
                 ]
             );
-            stats.appointmentsUpserts += 1;
+            resultDoctors.rows[0].xmax === "0" ? stats.appointmentsUpserts += 1 : null;
+            
         }
 
         await client.query("COMMIT");
